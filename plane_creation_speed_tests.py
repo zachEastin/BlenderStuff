@@ -1,15 +1,15 @@
 import bpy
 import bmesh
-from bpy.types import GeometryNodeGroup
+from bpy.types import GeometryNodeGroup, Object, Mesh, NodesModifier
 import numpy as np
-# from timeit import default_timer as dt
 import timeit
 
 print(" STARTING ".center(60, "-"))
 
 
-def bmesh_op(x, y):
-    me = bpy.context.object.data
+def bmesh_op(x: int, y: int):
+    """Generate a grid object using bmesh ops"""
+    me: Mesh = bpy.context.object.data
 
     bm = bmesh.new()
     bmesh.ops.create_grid(
@@ -22,34 +22,36 @@ def bmesh_op(x, y):
     me.update()
 
 
-def bpy_py(x, y):
-    def from_mydata(mesh: bpy.types.Mesh, vertices: np.ndarray, faces: np.ndarray, faces_len):
-        """
-        vertices - must be single dimensional numpy array of vertex coordinates. Length of list should be x*y*3
-        faces
+def bpy_py(x: int, y: int):
+    """Generate a grid object using mesh ops"""
+    def from_mydata(mesh: Mesh, vertices: np.ndarray, faces: np.ndarray, faces_len:int) -> None:
+        """Like Blender's mesh.from_pydata but optimized for numpy and grid creation
+
+        Parameters
+        ----------
+        mesh : Mesh
+        vertices : np.ndarray
+            1D numpy array of vertex coordinates. Length of list should be x*y*3
+        faces : np.ndarray
+            1D numpy array of each face's vertex indices. Length should be (y-1)*(x-1)*4
+        faces_len : int
+            The number of faces
         """
         mesh.clear_geometry()
-        # from itertools import chain, islice, accumulate
 
-        # face_lengths = tuple(map(len, faces)) # list of how many verts each face has
         face_lengths = np.full(faces_len, 4)  # Assume we have 4 verts per face
 
-        # NOTE: check non-empty lists by length because of how `numpy` handles truth tests, see: T90268.
         vertices_len = int(len(vertices)/3)
-        # faces_len = len(faces)
 
         mesh.vertices.add(vertices_len)
         mesh.loops.add(len(faces))
-        # mesh.loops.add(sum(face_lengths))
         mesh.polygons.add(faces_len)
 
         mesh.vertices.foreach_set("co", vertices)
 
-        # vertex_indices = tuple(chain.from_iterable(faces)) # basically np.flatten
         vertex_indices = faces.copy()
         # Can assume each face has only 4 verts
         loop_starts = np.arange(faces_len)*4
-        # loop_starts = tuple(islice(chain([0], accumulate(face_lengths)), faces_len))
 
         mesh.polygons.foreach_set("loop_total", face_lengths)
         mesh.polygons.foreach_set("loop_start", loop_starts)
@@ -57,13 +59,10 @@ def bpy_py(x, y):
 
         if faces_len:
             mesh.update(
-                # Needed to either:
-                # - Calculate edges that don't exist for polygons.
-                # - Assign edges to polygon loops.
                 calc_edges=True
             )
 
-    me = bpy.context.object.data
+    me: Mesh = bpy.context.object.data
 
     # VERTS
     verts = np.zeros([y, x, 3], dtype=float)
@@ -104,8 +103,10 @@ def bpy_py(x, y):
     me.update()
 
 
-def geo_node(x, y):
+def geo_node(x: int, y: int):
+    """Generate a grid object using geometry nodes"""
     def create_plane_gen_nodes(obj) -> GeometryNodeGroup:
+        """Create a geometry node group designed just to create grids"""
         ng = bpy.data.node_groups.new('Plane Generator', 'GeometryNodeTree')
         nodes = ng.nodes
         links = ng.links
@@ -119,9 +120,11 @@ def geo_node(x, y):
                   grid_node.outputs[0])
         return ng
 
-    obj = bpy.context.object
-    mod = obj.modifiers.new('Plane Generator', 'NODES')
+    obj: Object = bpy.context.object
 
+    mod: NodesModifier = obj.modifiers.new('Plane Generator', 'NODES')
+
+    # Creat Plane with Geo Nodes
     ng = bpy.data.node_groups.get('Plane Generator')
     if not ng:
         ng = create_plane_gen_nodes(obj)
@@ -129,12 +132,13 @@ def geo_node(x, y):
     ng.nodes['Grid'].inputs['Vertices X'].default_value = x
     ng.nodes['Grid'].inputs['Vertices Y'].default_value = y
 
-    # bpy.ops.object.modifier_apply(modifier='Plane Generator')
+    # Apply Modifier
     dg = bpy.context.evaluated_depsgraph_get()
     mesh = bpy.data.meshes.new_from_object(obj.evaluated_get(dg))
     obj.modifiers.remove(mod)
     obj.data = mesh
 
+    # Reset Node Group to not cause slow downs when assigning to a new object
     ng.nodes['Grid'].inputs['Vertices X'].default_value = 3
     ng.nodes['Grid'].inputs['Vertices Y'].default_value = 3
 
@@ -146,7 +150,7 @@ def mytimeit(title, SETUP_CODE, TEST_CODE, repeat, number):
                           repeat=repeat,
                           number=number)
 
-    # printing minimum exec. time
+    # Print out Results
     avg = sum(times)/len(times)
     error_range = max(times) - avg
     print(
@@ -156,17 +160,15 @@ def mytimeit(title, SETUP_CODE, TEST_CODE, repeat, number):
 
 
 def bpy_ops_time(x, y, repeat, number):
+    """Time bpy ops grid creation"""
     SETUP_CODE = "import bpy"
     TEST_CODE = f'bpy.ops.mesh.primitive_grid_add(x_subdivisions={x},y_subdivisions={y},);bpy.data.objects.remove(bpy.data.objects["Grid"])'
-
-    objs = set(bpy.data.objects)
 
     mytimeit("BPY OPS", SETUP_CODE, TEST_CODE, repeat, number)
 
 
-
-
 def bmesh_ops_time(x, y, repeat, number):
+    """Time bmesh ops grid creation"""
     SETUP_CODE = '''
 import bpy, bmesh
 from __main__ import bmesh_op'''
@@ -176,6 +178,7 @@ from __main__ import bmesh_op'''
 
 
 def bpy_py_time(x, y, repeat, number):
+    """Time bpy mesh ops grid creation"""
     SETUP_CODE = '''
 import bpy
 from __main__ import bpy_py'''
@@ -185,6 +188,7 @@ from __main__ import bpy_py'''
 
 
 def geo_node_time(x, y, repeat, number):
+    """Time geo nodes grid creation"""
     SETUP_CODE = '''
 import bpy
 from __main__ import geo_node'''
@@ -194,6 +198,7 @@ from __main__ import geo_node'''
 
 
 if __name__ == "__main__":
+    # Change These
     x = 100
     y = 100
     runs = 3
