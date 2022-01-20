@@ -265,9 +265,16 @@ if __name__ == "__main__":
 
     geo_node_time(obj.name, x, y, runs, loops)
 
+    coords = np.random.random(x*y*3)
+
+    print()
+    print(" Single Py Ops Timings:".rjust(60, '-'))
+    st = dt()
+    set_py(obj.data, coords)
+    print(" Total Timings:".rjust(30, '-'), dt()-st)
+
     print()
     print(" Single Geo Nodes Detailed Timings:".rjust(60,'-'))
-    coords = np.random.random(x*y*3)
     st = dt()
     set_geo_nodes_timed(obj, coords)
     print(" Total Timings:".rjust(30, '-'), dt()-st)
