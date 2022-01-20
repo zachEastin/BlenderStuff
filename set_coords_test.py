@@ -80,7 +80,7 @@ def ensure_geo_setter() -> Tuple[GeometryNodeTree,str]:
         # A - NodeSocketString
         set_pos_node.inputs[3].default_value = 'position'
         # Result - NodeSocketString
-        set_pos_node.inputs[7].default_value = 'position'
+        set_pos_node.inputs[11].default_value = 'position'
 
     return (ng, ng.inputs[-1].identifier)
 def set_geo_nodes(obj:'Object', coords:np.ndarray) -> None:
@@ -223,7 +223,7 @@ def mytimeit(title, SETUP_CODE, TEST_CODE, repeat, number):
 
 
 def bpy_py_time(me_name:str, x:int, y:int, repeat, number):
-    """Time bpy mesh ops grid creation"""
+    """Time bpy mesh ops vertex coordinate setting"""
     SETUP_CODE = f'''
 import bpy, numpy as np
 from __main__ import set_py
