@@ -18,7 +18,7 @@
 
 bl_info = {
     "name": "Fix ColorSpace",
-    "author": "ChatGPT / Blender Bob",
+    "author": "ChatGPT / Blender Bob / True-VFX",
     "blender": (2, 80, 0),
     "description": "Changes the color space of image nodes based on specific image names.",
     "category": "Material",
@@ -42,36 +42,16 @@ class FixColorSpaceBase:
     color_space:str
     non_color_space:str
 
-    def set_color_space(self, image:Image):
-        """Set the color space of an image based on its name."""
-        has_keyword = False
-        for keyword in KEYWORDS:
-            if keyword in image.name.lower():
-                image.colorspace_settings.name = self.non_color_space
-                has_keyword = True
-                break
-            if not has_keyword:
-                image.colorspace_settings.name = self.color_space
-    
-    def find_image_nodes(self, node_tree: ShaderNodeTree):
-        """Find all image nodes in a node tree and set their color space. If a group node is found explore its node tree recursively."""
-        for node in node_tree.nodes:
-            if node.type == 'TEX_IMAGE' and node.image:
-                self.set_color_space(node.image)
-            elif node.type == 'GROUP':
-                self.find_image_nodes(node.node_tree)
-
-    def execute(self, _context):
-        # Set color space for images in all materials
-        for material in bpy.data.materials:
-            if material.node_tree:
-                self.find_image_nodes(material.node_tree)
-        
-        # Set color space for images in all worlds
-        for world in bpy.data.worlds:
-            if world.node_tree:
-                self.find_image_nodes(world.node_tree)
-        
+    def execute(self, context):
+        for image in bpy.data.images:
+            has_keyword = False
+            for keyword in KEYWORDS:
+                if keyword in image.name.lower():
+                    image.colorspace_settings.name = self.non_color_space
+                    has_keyword = True
+                    break
+                if not has_keyword:
+                    image.colorspace_settings.name = self.color_space
         return {'FINISHED'}
 
 
